@@ -1,0 +1,246 @@
+{
+  "name": "Topic 14 - Sub-Workflows, Debugging & Production Readiness",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e9a10001-0001-4000-8000-000000000001",
+      "name": "Manual_Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      orderId: \"ORD-MODULAR-901\",\n      customerName: \"Acme Corporation\",\n      state: \"CA\",\n      subtotal: 1000.00\n    }\n  }\n];"
+      },
+      "id": "e9a10001-0002-4000-8000-000000000002",
+      "name": "Code_StageMasterOrder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "sub-wf-tax-engine-01",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "id": "e9a10001-0003-4000-8000-000000000003",
+      "name": "Execute_TaxSubWorkflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const order = $node['Code_StageMasterOrder'].json;\nconst taxResult = $input.item.json;\nreturn {\n  json: {\n    ...order,\n    taxRate: taxResult.appliedTaxRate,\n    taxAmount: taxResult.taxAmount,\n    grandTotal: taxResult.grandTotal\n  }\n};"
+      },
+      "id": "e9a10001-0004-4000-8000-000000000004",
+      "name": "Code_MergeTaxTotals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        860,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "sub-wf-payment-gateway-02",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {}
+      },
+      "id": "e9a10001-0005-4000-8000-000000000005",
+      "name": "Execute_PaymentSubWorkflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        1080,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payment = $input.item.json;\nconst order = $node['Code_MergeTaxTotals'].json;\nreturn {\n  json: {\n    orchestrationResult: \"ORDER_FULFILLED_VIA_MICROSERVICES\",\n    orderId: order.orderId,\n    customer: order.customerName,\n    subtotal: order.subtotal,\n    state: order.state,\n    taxRate: order.taxRate,\n    taxAmount: order.taxAmount,\n    grandTotalPaid: order.grandTotal,\n    paymentStatus: payment.paymentStatus || \"CONFIRMED\",\n    authCode: payment.transactionRef || \"AUTH-89AF1C2\",\n    executedSubWorkflows: [\n      \"Sub-Workflow 1: Tax Engine\",\n      \"Sub-Workflow 2: Payment Gateway\"\n    ],\n    completedAt: new Date().toISOString()\n  }\n};"
+      },
+      "id": "e9a10001-0006-4000-8000-000000000006",
+      "name": "Code_BuildOrchestratorSummary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        340
+      ]
+    }
+  ],
+  "pinData": {
+    "Code_StageMasterOrder": [
+      {
+        "json": {
+          "orderId": "ORD-MODULAR-901",
+          "customerName": "Acme Corporation",
+          "state": "CA",
+          "subtotal": 1000.00
+        }
+      }
+    ],
+    "Execute_TaxSubWorkflow": [
+      {
+        "json": {
+          "orderId": "ORD-MODULAR-901",
+          "subtotal": 1000.00,
+          "state": "CA",
+          "appliedTaxRate": 0.0825,
+          "taxAmount": 82.50,
+          "grandTotal": 1082.50,
+          "taxCalculatedAt": "2026-11-06T14:30:00.000Z"
+        }
+      }
+    ],
+    "Code_MergeTaxTotals": [
+      {
+        "json": {
+          "orderId": "ORD-MODULAR-901",
+          "customerName": "Acme Corporation",
+          "state": "CA",
+          "subtotal": 1000.00,
+          "taxRate": 0.0825,
+          "taxAmount": 82.50,
+          "grandTotal": 1082.50
+        }
+      }
+    ],
+    "Execute_PaymentSubWorkflow": [
+      {
+        "json": {
+          "paymentStatus": "CONFIRMED",
+          "transactionRef": "AUTH-7F89DC1",
+          "amountCharged": 1082.50,
+          "processedAt": "2026-11-06T14:30:01.000Z"
+        }
+      }
+    ],
+    "Code_BuildOrchestratorSummary": [
+      {
+        "json": {
+          "orchestrationResult": "ORDER_FULFILLED_VIA_MICROSERVICES",
+          "orderId": "ORD-MODULAR-901",
+          "customer": "Acme Corporation",
+          "subtotal": 1000.00,
+          "state": "CA",
+          "taxRate": 0.0825,
+          "taxAmount": 82.50,
+          "grandTotalPaid": 1082.50,
+          "paymentStatus": "CONFIRMED",
+          "authCode": "AUTH-7F89DC1",
+          "executedSubWorkflows": [
+            "Sub-Workflow 1: Tax Engine",
+            "Sub-Workflow 2: Payment Gateway"
+          ],
+          "completedAt": "2026-11-06T14:30:02.000Z"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Manual_Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code_StageMasterOrder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code_StageMasterOrder": {
+      "main": [
+        [
+          {
+            "node": "Execute_TaxSubWorkflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute_TaxSubWorkflow": {
+      "main": [
+        [
+          {
+            "node": "Code_MergeTaxTotals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code_MergeTaxTotals": {
+      "main": [
+        [
+          {
+            "node": "Execute_PaymentSubWorkflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute_PaymentSubWorkflow": {
+      "main": [
+        [
+          {
+            "node": "Code_BuildOrchestratorSummary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f9d0e1f2-1414-4c1e-9914-subworkflowsorchestrator",
+  "meta": {
+    "instanceId": "tayana-enterprise-n8n-level-2-topic-14"
+  },
+  "id": "Topic_14_Sub_Workflows_Debugging_Production",
+  "tags": [
+    {
+      "name": "Level-2-Intermediate",
+      "id": "lvl2"
+    },
+    {
+      "name": "Sub-Workflows",
+      "id": "sub-workflows"
+    },
+    {
+      "name": "Execute-Workflow",
+      "id": "execute-workflow"
+    },
+    {
+      "name": "Production-Readiness",
+      "id": "production-readiness"
+    }
+  ]
+}
